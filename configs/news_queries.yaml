@@ -2,12 +2,17 @@
 # Each entry becomes one RSS fetch per daily run. Edit freely; no code changes needed.
 # Reviewed: 2026-04-27
 
-# Demand signals — events and language that indicate buyer urgency.
+# Demand signals — events and language that indicate buyer *intent*, not just topic.
+# We tightened these on 2026-04-28 after the first run showed bare topic queries
+# (e.g. "water level monitoring") returned mostly press releases and review articles
+# — high topic match but zero buyer signal. Now every query co-requires a buying-
+# intent term (RFP / seeking / hires / deploys / awarded / installs / piloting).
 demand:
-  - '"water level monitoring" OR "flood early warning" OR "flood sensor"'
-  - '"king tide" OR "sunny day flooding" OR "tidal flooding"'
-  - '"storm surge" "early warning"'
-  - '"real-time flood" OR "real-time water level"'
+  - '("seeking" OR "hires" OR "selects" OR "RFP" OR "request for proposals") ("flood early warning" OR "water level monitoring" OR "flood sensors" OR "tide gauge")'
+  - '("deploys" OR "installs" OR "piloting" OR "rolls out") ("flood sensor" OR "water level monitor" OR "early warning system")'
+  - '("king tide" OR "sunny day flooding" OR "tidal flooding") ("city" OR "county" OR "department")'
+  - '"storm surge" "early warning" ("city" OR "county" OR "state")'
+  - '("real-time flood" OR "real-time water level") ("network" OR "deployment" OR "system")'
 
 # Procurement signals — explicit RFP / contract / award chatter not yet on SAM.gov.
 procurement:

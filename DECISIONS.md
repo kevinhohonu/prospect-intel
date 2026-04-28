@@ -122,8 +122,35 @@ Rubric lives as a config so it can be tuned without code changes.
 
 ---
 
+## 2026-04-28: WORTH_NOTING goes to a daily CSV + Slack digest, not individual messages
+**Decision:** SURFACE keeps individual rich Slack posts. WORTH_NOTING is written to `data/outputs/worth_noting-YYYY-MM-DD.csv` (committed back by the workflow) and surfaced to Slack as a single end-of-run digest message with the top-5 by total score, plus a count + path to the full CSV. SKIP is audit-log only.
+
+**Alternatives considered:** Post each WORTH_NOTING as its own Slack message (original design); chunked digest with all items inline.
+
+**Why rejected:** First real run produced 284 WORTH_NOTING items. Per-item posting (a) hits Slack's ~1 msg/sec webhook rate limit, (b) buries the SURFACE posts under hundreds of one-liners, and (c) makes the channel unusable to skim. Chunked digest fits in Slack but is still a wall of text. CSV is sortable/filterable in a spreadsheet, top-5 digest preserves cluster-pattern discovery in Slack ("three FL counties this week"), and channel stays clean.
+
+---
+
+## 2026-04-28: Hard score-floor demotes obvious-noise WORTH_NOTING to SKIP
+**Decision:** After Claude returns its classification, demote any WORTH_NOTING/SURFACE with total score <5 to SKIP. Implemented in `triage.apply_score_floor()`. Reasoning gets prefixed with `[auto-floor: total<5]` so the audit trail is honest about what happened.
+
+**Alternatives considered:** Tighten the rubric prompt and trust Claude's judgment; use a higher floor (≥6); make the floor configurable.
+
+**Why rejected:** Audit log after first run showed ~17 of 284 WORTH_NOTING items scored ≤4/10 — uniformly competitor PR fluff, off-topic FEMA org news, generic water articles. Claude was being generous on classification despite scoring them low. A code-side floor is deterministic, cheap, and easy to remove if it ever bites a real signal. Floor at 5 (rather than 6) preserves Claude's discretion on borderline items.
+
+---
+
+## 2026-04-28: News queries require buyer intent, not just topic
+**Decision:** `demand` queries in `configs/news_queries.yaml` rewritten to co-require an intent verb ("seeking", "hires", "selects", "deploys", "installs", "RFP", etc.) alongside the topic phrase. Bare `"water level monitoring"` removed.
+
+**Alternatives considered:** Keep broad topic queries and rely on Claude triage to filter; drop `demand` category entirely.
+
+**Why rejected:** Bare topic queries returned mostly product reviews and trade-press articles — high topic match (Claude scored topic=3-4) but zero buyer signal, classified WORTH_NOTING but useless. Filtering at query time is free; filtering at triage time costs a Claude call per noise item. Dropping the category loses real demand events (cities issuing RFPs, agencies hiring firms). Intent-loaded queries keep the signal and lose most of the noise.
+
+---
+
 ## 2026-04-27: Monitor state (seen-set + audit log) committed back to the repo by the workflow
-**Decision:** GitHub Actions workflow does `git add -f data/state/ logs/` and pushes after each run. State files are gitignored locally but force-added by the bot.
+**Decision:** GitHub Actions workflow does `git add -f data/state/ data/outputs/ logs/` and pushes after each run. State files are gitignored locally but force-added by the bot.
 
 **Alternatives considered:** External store (S3, GitHub Actions cache, dedicated branch).
 
