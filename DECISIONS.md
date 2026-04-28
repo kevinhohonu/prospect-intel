@@ -46,3 +46,49 @@ Append-only. Each entry: date, decision, alternatives considered, why we chose t
 **Alternatives considered:** Build inside an existing project; build inline in the Claude/ root.
 
 **Why rejected:** Clean separation per Kevin's preference. Avoids cross-contamination with orchestrator/ or recon/.
+
+---
+
+## 2026-04-27: Opportunity monitor runs on GitHub Actions, posts to private Slack channel
+**Decision:** Daily run via GitHub Actions cron-style workflow. Notification via Slack incoming webhook to a private channel for Kevin (e.g. `#hohonu-intel`). Secrets in GitHub repo secrets.
+
+**Alternatives considered:** macOS launchd (local cron); small cloud server; email digest.
+
+**Why rejected:** Local cron silently skips when laptop is off or asleep, creating "missed it that day" risk. Cloud server is overkill for a daily 5-minute job. Slack channel beats email for persistent searchable history, one-click forwarding, and reaction-based triage. Adding Brian/Lisa later is a one-click channel invite, no infra change.
+
+---
+
+## 2026-04-27: MVP is Slack-only; no HubSpot logging until we learn from it
+**Decision:** First version of opportunity monitor posts to Slack and logs to a JSONL audit file only. No HubSpot deals, notes, or pipeline created in MVP. Revisit HubSpot integration after a week of operating data.
+
+**Alternatives considered:** Build full HubSpot deal pipeline + custom properties + auto-association in MVP.
+
+**Why rejected:** Premature integration adds 2-3 days of work for a feature we may not need or may want differently. Slack-only ships fast and reveals real requirements. HubSpot integration design should be informed by what we actually want to do with surfaced opportunities, which we'll know after operating the Slack flow for a week.
+
+---
+
+## 2026-04-27: Filter via judgment, not numeric thresholds
+**Decision:** Claude evaluates each candidate against a rubric (topic match, buyer match, geography match, actionability, plus boosters and auto-disqualifiers) but the surface/skip decision is qualitative. Three possible outputs: `SURFACE` (full Slack post), `WORTH_NOTING` (one-line Slack post in same channel), `SKIP` (JSONL only). Dimension scores and reasoning are included in every output for auditability.
+
+**Alternatives considered:** Hard threshold mapping (8-10 surfaces, 5-7 digests, <5 skips).
+
+**Why rejected:** Rigid thresholds create false negatives - e.g., a perfect-topic-match RFP outside active-market geography would auto-fail despite being worth knowing about. Pure judgment without structure risks drift. The hybrid: rubric forces structured analysis, judgment makes the call, reasoning stays transparent.
+
+**Rubric (current version):**
+- Topic match (0-4): water level / flood early warning specificity
+- Buyer match (0-3): direct ICP through unrelated
+- Geography match (0-2): active markets / coastal expansion / inland low-risk
+- Actionability (0-1): live opportunity vs. historical
+- Boosters (+1 max): warm-path county, co-op vehicle, "early warning system" wording
+- Auto-disqualifiers: already awarded, expired, outside North America, pure private sector
+
+Rubric lives as a config so it can be tuned without code changes.
+
+---
+
+## 2026-04-27: Source selection deliberated at start of Slice 1 chat (not assumed at scaffolding time)
+**Decision:** The set of sources the monitor scans (SAM.gov, Grants.gov, Google News, state portals, county portals, industry pubs, etc.) is the most consequential design choice for the monitor. It deserves dedicated discussion at the start of the Slice 1 chat, not an assumption baked in here.
+
+**Alternatives considered:** Lock SAM.gov as the MVP source now.
+
+**Why rejected:** Sources determine what the system can ever see. A perfect filter on a bad source pile is worthless. Worth a focused conversation rather than a quick assumption. Likely starting point for that conversation: SAM.gov + Grants.gov + Google News (all have stable APIs); Florida + Texas state portals as Slice 1.5; county-level scraping deferred.
