@@ -62,32 +62,45 @@ def _total(t: TriageResult) -> int:
     return sum(t.scores.get(k, 0) for k in ("topic", "buyer", "geography", "actionability", "boosters"))
 
 
+# Slack section blocks have a 3000-char text limit. Google News URLs alone
+# can run 600+ chars; five items packed into one section block blows the
+# limit and Slack returns 400. We render one section block per item — Slack
+# allows 50 blocks per message, each with its own 3000-char budget.
+_REASONING_PREVIEW_CHARS = 220
+
+
 def _digest_blocks(items: list[tuple[Candidate, TriageResult]], csv_relpath: str) -> list[dict]:
-    """One Slack message: header + top-N items + footer pointing at the CSV."""
+    """One Slack message: header + one section per top-N item + footer pointing at the CSV."""
     top = sorted(items, key=lambda ct: -_total(ct[1]))[: _DIGEST_TOP_N]
-    bullet_lines = [
-        f"• <{c.url}|{c.title}> _({c.source}, {_total(t)}/10)_ — {t.reasoning}"
-        for c, t in top
-    ]
+
     blocks: list[dict] = [
         {
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"*📋 {len(items)} worth-noting items today* — top {min(_DIGEST_TOP_N, len(items))} below",
+                "text": f"*📋 {len(items)} worth-noting items today* — top {min(_DIGEST_TOP_N, len(items))} below (full list in CSV)",
             },
-        },
-        {
-            "type": "section",
-            "text": {"type": "mrkdwn", "text": "\n".join(bullet_lines)},
-        },
+        }
+    ]
+    for c, t in top:
+        reasoning = t.reasoning if len(t.reasoning) <= _REASONING_PREVIEW_CHARS else t.reasoning[: _REASONING_PREVIEW_CHARS - 1].rstrip() + "…"
+        blocks.append(
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"<{c.url}|{c.title}>\n_{c.source} · {_total(t)}/10_ — {reasoning}",
+                },
+            }
+        )
+    blocks.append(
         {
             "type": "context",
             "elements": [
                 {"type": "mrkdwn", "text": f"Full list: `{csv_relpath}` (committed to repo)"}
             ],
-        },
-    ]
+        }
+    )
     return blocks
 
 
