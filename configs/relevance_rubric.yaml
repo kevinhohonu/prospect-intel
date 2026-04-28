@@ -1,0 +1,88 @@
+# Rubric used by Claude to triage opportunity candidates.
+# Edit this file to tune the monitor without code changes.
+# Last reviewed: 2026-04-27
+
+company_context: |
+  Hohonu sells water-level / flood / tide monitoring sensors and data services.
+  Customers fall into these ICPs:
+    - County/municipal Emergency Management
+    - Public Works
+    - Departments of Transportation (DOT)
+    - Resilience / sustainability offices
+    - Engineering / coastal consulting firms (Woods Hole Group, Kimley-Horn, HDR, Moffatt & Nichol, Sea & Shoreline)
+    - Academic research (Sea Grant, NERACOOS, IOOS regional associations, university coastal labs)
+    - Federal: USACE, NOAA, FEMA-funded pass-through
+    - Nonprofits doing coastal/estuary work
+
+active_markets:
+  tier_1_active: [AK, CA, FL, HI, ME, MD, MA, MI, NY, NC, SC, TX, VA, WA]
+  tier_2_expansion: [LA, MS, AL, GA, NJ, CT, RI, NH, OR]
+
+rubric:
+  topic_match:
+    range: [0, 4]
+    description: |
+      4 = explicit water level / tide gauge / flood sensor / hydrologic monitoring / flood early warning system
+      3 = adjacent: coastal resilience, storm surge monitoring, real-time flood data, IoT environmental sensors
+      2 = related but indirect: flood mitigation infrastructure, stormwater management, climate adaptation
+      1 = mentions water/flood but unrelated technical scope
+      0 = no topical relevance
+  buyer_match:
+    range: [0, 3]
+    description: |
+      3 = direct ICP issuing/receiving (county EM, public works, DOT, USACE, NOAA, named consultancy)
+      2 = adjacent buyer (state agency, university lab, regional planning org)
+      1 = potential buyer but not core (private utility, federal lab outside our touchpoints)
+      0 = unrelated buyer
+  geography_match:
+    range: [0, 2]
+    description: |
+      2 = within tier_1_active states (existing customer footprint)
+      1 = within tier_2_expansion states (coastal-adjacent expansion targets)
+      0 = inland/low-coastal-risk states OR outside North America
+  actionability:
+    range: [0, 1]
+    description: |
+      1 = live, forward-looking opportunity (open RFP, posted grant, recent award announcement signaling expansion)
+      0 = historical reference, already-awarded with no follow-on hook, or pure background news
+  boosters:
+    max_total: 1
+    description: |
+      +1 (cap at 1 total) if any apply:
+        - Warm-path county (existing Hohonu customer or known engineering-firm relationship)
+        - Cooperative purchasing vehicle mentioned (Sourcewell, BuyBoard, TX co-op, GSA)
+        - Phrase "early warning system" used explicitly
+        - Federal program names: BRIC, HMGP, FMA, NOAA Coastal Resilience Fund, FEMA RPS
+
+auto_disqualifiers:
+  - Opportunity already awarded with no realistic re-bid window
+  - Solicitation expired / past response deadline
+  - Geography outside North America (except Hohonu's Mexico/EDF relationship)
+  - Pure private-sector commercial buyer with no government nexus
+  - Competitor displacement is not a disqualifier — flag as WORTH_NOTING with competitor name in reasoning
+
+classification_guidance: |
+  Use the rubric to inform structured analysis, then make a qualitative call:
+
+  SURFACE: high signal, post full Slack notification.
+    Typically: topic >= 3, buyer >= 2, geography >= 1, actionability = 1, no disqualifiers.
+    Or: topic = 4 anywhere, even outside active markets, if actionable.
+    Or: warm-path booster + reasonable rubric scores.
+
+  WORTH_NOTING: lower signal, post one-line Slack mention.
+    Typically: relevant topic but missing geography/buyer fit, or competitor moves,
+    or adjacent grant programs we should track for context.
+
+  SKIP: no Slack post, audit-log only.
+    Typically: low topic match, hits a disqualifier, or pure noise.
+
+  Always include the rubric scores and one-sentence reasoning in output for auditability.
+  Edge cases: when in doubt between SURFACE and WORTH_NOTING, choose WORTH_NOTING. Better
+  to under-surface than to train Kevin to ignore the channel.
+
+competitors:
+  established: [Xylem, YSI, Sutron, OneRain]
+  newer_entrants: [Divirod, HyFi, FloodNet, Aware]
+  treatment: |
+    Competitor wins are WORTH_NOTING displacement signals, not SURFACE. Always include
+    the competitor name in the reasoning so Kevin can pattern-match across hits.

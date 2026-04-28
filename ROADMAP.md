@@ -7,21 +7,24 @@ Current state of play. **Update at the end of every chat.**
 ## Built
 
 - Project scaffolding: directory structure, CLAUDE.md, DECISIONS.md, ROADMAP.md, README.md, .gitignore, git init (2026-04-27)
+- **Slice 1: Opportunity monitor MVP** (2026-04-27)
+  - Sources: SAM.gov, Grants.gov, Google News RSS (per `configs/news_queries.yaml`)
+  - Two-layer dedup: persistent `data/state/seen_ids.json` + intra-run title-hash
+  - Triage via Claude (Sonnet 4.6) against `configs/relevance_rubric.yaml`, with prompt caching
+  - Outputs: SURFACE → full Slack block post, WORTH_NOTING → one-line, SKIP → audit-only
+  - Audit log: `data/state/opportunities.jsonl` (every candidate + triage decision)
+  - Run via `python -m src.monitor.main` (supports `--dry-run`) or GitHub Actions daily cron at 13:00 UTC
 
 ## In progress
 
-(nothing - end of scaffolding chat)
+(nothing — end of Slice 1 build)
 
 ## Next up - in slice order
 
-1. **Slice 1: Opportunity monitor MVP**
-   - **First decision in Slice 1 chat:** confirm source list (likely starting set: SAM.gov + Grants.gov + Google News; FL + TX state portals deferred to 1.5)
-   - Runs on GitHub Actions, daily cron
-   - Filtering: rubric-guided judgment by Claude, returns SURFACE / WORTH_NOTING / SKIP with reasoning
-   - Output: posts to private Slack channel via incoming webhook
-   - Audit log: every candidate written to `data/state/opportunities.jsonl` (append-only) with full reasoning
-   - **No HubSpot integration in MVP.** Revisit after operating data
-   - Rubric stored as config (e.g. `configs/relevance_rubric.yaml`) for tuning without code changes
+1. **Slice 1 operate-and-tune (1 week)**
+   - Run daily, watch Slack volume + audit log
+   - Tune rubric / queries based on what surfaces vs. what should have
+   - Then revisit: HubSpot integration design, FL/TX state portal addition, NewsAPI upgrade decision
 
 2. **Slice 2: FL warm follow-up list**
    - Extract the 24 drip-engaged FL EM Directors from spreadsheet
@@ -77,3 +80,6 @@ Current state of play. **Update at the end of every chat.**
 - Notification channel? -> Private Slack channel via incoming webhook (see DECISIONS.md 2026-04-27)
 - HubSpot integration in MVP? -> No, Slack-only, revisit after operating data (see DECISIONS.md 2026-04-27)
 - Filter mechanism? -> Judgment-based with rubric-guided analysis, not numeric thresholds (see DECISIONS.md 2026-04-27)
+- Source list? -> SAM.gov + Grants.gov + Google News RSS (FL/TX state portals deferred to 1.5; see DECISIONS.md 2026-04-27)
+- State persistence? -> Committed back to repo by the workflow (see DECISIONS.md 2026-04-27)
+- Triage model? -> Sonnet 4.6 with prompt caching, one candidate per call (see DECISIONS.md 2026-04-27)

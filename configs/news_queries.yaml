@@ -1,0 +1,37 @@
+# Google News RSS queries for the opportunity monitor.
+# Each entry becomes one RSS fetch per daily run. Edit freely; no code changes needed.
+# Reviewed: 2026-04-27
+
+# Demand signals — events and language that indicate buyer urgency.
+demand:
+  - '"water level monitoring" OR "flood early warning" OR "flood sensor"'
+  - '"king tide" OR "sunny day flooding" OR "tidal flooding"'
+  - '"storm surge" "early warning"'
+  - '"real-time flood" OR "real-time water level"'
+
+# Procurement signals — explicit RFP / contract / award chatter not yet on SAM.gov.
+procurement:
+  - '("RFP" OR "request for proposals") ("flood monitoring" OR "water level" OR "tide gauge" OR "hydrologic monitoring")'
+  - '("coastal resilience" OR "flood mitigation") ("awarded" OR "selected" OR "contract")'
+
+# Funding signals — federal/state grants dropping money into specific counties.
+# Split by region so URL length stays sane and per-region tuning is possible.
+funding_atlantic_gulf:
+  - '"FEMA" "disaster declaration" (Florida OR Texas OR Louisiana OR Georgia OR "South Carolina" OR "North Carolina" OR Virginia OR Maryland OR Massachusetts OR Maine)'
+  - '"BRIC grant" OR "Hazard Mitigation Grant" OR "HMGP award" OR "Flood Mitigation Assistance"'
+funding_pacific:
+  - '"FEMA" "disaster declaration" (California OR Washington OR Oregon OR Alaska OR Hawaii)'
+  - '"NOAA Coastal Resilience" OR "NOAA Coastal Zone Management" California OR Washington OR Hawaii OR Alaska'
+funding_great_lakes_midatlantic:
+  - '"FEMA" "disaster declaration" (Michigan OR "New York" OR "New Jersey" OR Connecticut OR "Rhode Island")'
+
+# Cooperative purchasing — co-op vehicles are warm-path procurement.
+coop:
+  - '"cooperative purchasing" ("flood" OR "water level" OR "resilience")'
+  - '"Sourcewell" OR "BuyBoard" "flood" OR "water"'
+
+# Competitor displacement — different query patterns by player type.
+competitor_established:
+  - '("Xylem" OR "YSI" OR "Sutron" OR "OneRain") "contract" ("county" OR "city" OR "municipal")'
+competitor_newer:
+  - '("Divirod" OR "HyFi" OR "FloodNet" OR "Aware Systems") ("deployment" OR "pilot" OR "partnership")'
