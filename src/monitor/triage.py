@@ -26,6 +26,30 @@ MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = 600
 VALID_CLASSIFICATIONS = {"SURFACE", "WORTH_NOTING", "SKIP"}
 
+# Hard noise floor applied AFTER Claude's call. Anything Claude scored below
+# this — and not redeemed by a booster or active disqualifier flag — gets
+# demoted to SKIP regardless of Claude's classification. Empirically (per the
+# 2026-04-28 audit-log analysis) total<5 with no booster is uniformly noise:
+# competitor PR fluff, off-topic FEMA reorg news, generic "water" articles.
+# Letting Claude be generous on classification but hard-flooring at score
+# captures the few times Claude is right to upgrade a low-score item via
+# disqualifier-context, while killing the systematic over-classification.
+_MIN_TOTAL_FOR_NOTING = 5
+
+
+def _total_score(scores: dict[str, int]) -> int:
+    return sum(scores.get(k, 0) for k in ("topic", "buyer", "geography", "actionability", "boosters"))
+
+
+def apply_score_floor(result: TriageResult) -> TriageResult:
+    """Demote low-confidence WORTH_NOTING/SURFACE to SKIP based on total score."""
+    if result.classification == "SKIP":
+        return result
+    if _total_score(result.scores) < _MIN_TOTAL_FOR_NOTING:
+        result.classification = "SKIP"
+        result.reasoning = f"[auto-floor: total<{_MIN_TOTAL_FOR_NOTING}] " + result.reasoning
+    return result
+
 
 @dataclass
 class TriageResult:
@@ -126,4 +150,4 @@ class Triager:
             return TriageResult(classification="SKIP", error=f"api error: {e}")
 
         text = "".join(block.text for block in resp.content if getattr(block, "type", None) == "text")
-        return _parse(text)
+        return apply_score_floor(_parse(text))
