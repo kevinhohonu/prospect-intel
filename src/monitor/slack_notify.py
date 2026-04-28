@@ -69,7 +69,7 @@ def _total(t: TriageResult) -> int:
 _REASONING_PREVIEW_CHARS = 220
 
 
-def _digest_blocks(items: list[tuple[Candidate, TriageResult]], csv_relpath: str) -> list[dict]:
+def _digest_blocks(items: list[tuple[Candidate, TriageResult]], csv_link: str) -> list[dict]:
     """One Slack message: header + one section per top-N item + footer pointing at the CSV."""
     top = sorted(items, key=lambda ct: -_total(ct[1]))[: _DIGEST_TOP_N]
 
@@ -97,7 +97,7 @@ def _digest_blocks(items: list[tuple[Candidate, TriageResult]], csv_relpath: str
         {
             "type": "context",
             "elements": [
-                {"type": "mrkdwn", "text": f"Full list: `{csv_relpath}` (committed to repo)"}
+                {"type": "mrkdwn", "text": f"📊 <{csv_link}|Full list of {len(items)} items (CSV)>"}
             ],
         }
     )
@@ -113,11 +113,13 @@ def post_surface(webhook_url: str, candidate: Candidate, triage: TriageResult) -
 def post_worth_noting_digest(
     webhook_url: str,
     items: list[tuple[Candidate, TriageResult]],
-    csv_relpath: str,
+    csv_link: str,
 ) -> bool:
+    """csv_link should be a clickable URL (GitHub blob URL when running on
+    GH Actions, or a local file path / relpath as a fallback)."""
     if not items:
         return False
-    return _post(webhook_url, {"blocks": _digest_blocks(items, csv_relpath)}, "worth-noting digest")
+    return _post(webhook_url, {"blocks": _digest_blocks(items, csv_link)}, "worth-noting digest")
 
 
 def _post(webhook_url: str, payload: dict, label: str) -> bool:

@@ -37,6 +37,18 @@ NEWS_QUERIES_PATH = Path("configs/news_queries.yaml")
 WORTH_NOTING_CSV_DIR = Path("data/outputs")
 
 
+def _csv_link(csv_path: Path) -> str:
+    """Return a clickable URL to the CSV when we can build one (GH Actions sets
+    GITHUB_REPOSITORY automatically), otherwise fall back to the relative path.
+    The workflow commits the CSV back to the default branch, so a /blob/ URL on
+    the configured branch will resolve once the run completes."""
+    repo = os.environ.get("GITHUB_REPOSITORY")
+    branch = os.environ.get("GITHUB_REF_NAME") or "main"
+    if repo:
+        return f"https://github.com/{repo}/blob/{branch}/{csv_path.as_posix()}"
+    return str(csv_path)
+
+
 def _write_worth_noting_csv(items: list[tuple[Candidate, TriageResult]], stamp: str) -> Path:
     """One CSV per run. Sorted by total score desc so the top of the file is the
     most interesting stuff. Lives at data/outputs/worth_noting-YYYY-MM-DD.csv
@@ -151,7 +163,9 @@ def run(dry_run: bool = False) -> int:
         csv_path = _write_worth_noting_csv(worth_noting_items, stamp)
         LOG.info("worth_noting CSV: %s (%d items)", csv_path, len(worth_noting_items))
         if not dry_run and webhook:
-            slack_notify.post_worth_noting_digest(webhook, worth_noting_items, str(csv_path))
+            slack_notify.post_worth_noting_digest(
+                webhook, worth_noting_items, _csv_link(csv_path)
+            )
 
     if not dry_run:
         dedup.mark_seen(fresh, seen)
