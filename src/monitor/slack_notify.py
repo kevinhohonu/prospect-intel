@@ -113,5 +113,10 @@ def _post(webhook_url: str, payload: dict, label: str) -> bool:
         resp.raise_for_status()
         return True
     except requests.RequestException as e:
-        LOG.warning("Slack post failed for %s: %s", label, e)
+        # Don't log the exception verbatim — `requests` includes the full URL
+        # (incl. webhook secret) in the message of HTTPError, which then leaks
+        # into logs/, which we used to commit back to the repo. Now we only log
+        # the exception type + status code if available.
+        status = getattr(getattr(e, "response", None), "status_code", "?")
+        LOG.warning("Slack post failed for %s (%s, status=%s)", label, type(e).__name__, status)
         return False
