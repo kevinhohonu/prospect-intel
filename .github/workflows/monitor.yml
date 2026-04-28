@@ -1,0 +1,38 @@
+name: Opportunity Monitor
+
+on:
+  schedule:
+    # 13:00 UTC = 09:00 ET / 06:00 PT — fresh candidate set ready by morning standup
+    - cron: "0 13 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # so we can commit updated seen_ids.json + audit log back
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Run monitor
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SAM_API_KEY: ${{ secrets.SAM_API_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: python -m src.monitor.main
+
+      - name: Commit state
+        run: |
+          git config user.name "monitor-bot"
+          git config user.email "monitor-bot@users.noreply.github.com"
+          git add -f data/state/ logs/ || true
+          git diff --cached --quiet || git commit -m "monitor: $(date -u +%Y-%m-%dT%H:%MZ) state update"
+          git push

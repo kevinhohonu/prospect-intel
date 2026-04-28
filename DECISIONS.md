@@ -92,3 +92,39 @@ Rubric lives as a config so it can be tuned without code changes.
 **Alternatives considered:** Lock SAM.gov as the MVP source now.
 
 **Why rejected:** Sources determine what the system can ever see. A perfect filter on a bad source pile is worthless. Worth a focused conversation rather than a quick assumption. Likely starting point for that conversation: SAM.gov + Grants.gov + Google News (all have stable APIs); Florida + Texas state portals as Slice 1.5; county-level scraping deferred.
+
+---
+
+## 2026-04-27: Slice 1 source list confirmed: SAM.gov + Grants.gov + Google News RSS
+**Decision:** MVP scans three sources only. SAM.gov for federal RFPs/solicitations (api.data.gov key), Grants.gov for federal NOFOs (no auth), Google News RSS for demand/procurement/funding/competitor news (no auth). FL MFMP and TX ESBD state portals deferred to Slice 1.5. USASpending.gov reserved for Slice 5 enrichment. County portals and paid platforms (GovWin, BidNet) deferred indefinitely.
+
+**Alternatives considered:** Add NewsAPI.org for news (more flexibility); add USASpending.gov for forward signal; add state portals immediately.
+
+**Why rejected:** NewsAPI free tier is too limited and paid is $449/mo — wait for evidence we're missing signal before paying. USASpending is historical awards, better fit for enrichment than monitoring. State portals require HTML scraping with no clean API; defer until we have operating data on whether federal sources are sufficient.
+
+---
+
+## 2026-04-27: State footprint expanded beyond FL/TX to full active customer book
+**Decision:** Geography matching uses two tiers. Tier 1 (active customers): AK, CA, FL, HI, ME, MD, MA, MI, NY, NC, SC, TX, VA, WA. Tier 2 (coastal-adjacent expansion): LA, MS, AL, GA, NJ, CT, RI, NH, OR. State news queries split by region (Atlantic/Gulf, Pacific, Great Lakes/Mid-Atlantic) to keep URL length manageable and allow per-region tuning.
+
+**Alternatives considered:** FL + TX only for MVP, expanding later.
+
+**Why rejected:** Hohonu's actual customer book (per revenue sheet) spans both coasts plus Gulf/Great Lakes/Pacific Northwest/Alaska. Filtering geography to FL/TX would silently drop relevant signal in 12 other active states. Source: revenue book sheet `1wVsIyr2GN72ibZ2j0k8aFpA8sTnnb9mZKNjnYATrR-w`.
+
+---
+
+## 2026-04-27: Triage uses Claude Sonnet 4.6, one candidate per call, with prompt caching
+**Decision:** Each candidate gets its own Anthropic API call with the rubric in the system prompt and `cache_control: ephemeral`. Returns strict JSON parsed into a `TriageResult`.
+
+**Alternatives considered:** Batch N candidates per call to cut API requests; use Haiku 4.5 for cost.
+
+**Why rejected:** Batching makes structured-output parsing fragile and complicates per-candidate error isolation. Cost at expected daily volume (~80 candidates) is trivial either way (under $1/day). Sonnet 4.6 makes noticeably better judgment calls on the rubric than Haiku for this kind of nuanced classification, and prompt caching makes the cost gap negligible after the first call. Revisit if daily volume grows past a few hundred or judgment quality is fine on Haiku.
+
+---
+
+## 2026-04-27: Monitor state (seen-set + audit log) committed back to the repo by the workflow
+**Decision:** GitHub Actions workflow does `git add -f data/state/ logs/` and pushes after each run. State files are gitignored locally but force-added by the bot.
+
+**Alternatives considered:** External store (S3, GitHub Actions cache, dedicated branch).
+
+**Why rejected:** S3 adds infra and a credential. Actions cache is best-effort, can evict, and is awkward to inspect. A dedicated `monitor-state` branch is cleaner long-term but adds complexity. Committing to main is the simplest thing that gives durability + inspectability — the audit log lives next to the code, easy to grep. Reconsider if commit noise on main becomes annoying; switching to a state branch later is a small change.
