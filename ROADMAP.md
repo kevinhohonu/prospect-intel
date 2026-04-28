@@ -7,13 +7,14 @@ Current state of play. **Update at the end of every chat.**
 ## Built
 
 - Project scaffolding: directory structure, CLAUDE.md, DECISIONS.md, ROADMAP.md, README.md, .gitignore, git init (2026-04-27)
-- **Slice 1: Opportunity monitor MVP** (2026-04-27)
+- **Slice 1: Opportunity monitor MVP** (2026-04-27, refined 2026-04-28)
   - Sources: SAM.gov, Grants.gov, Google News RSS (per `configs/news_queries.yaml`)
   - Two-layer dedup: persistent `data/state/seen_ids.json` + intra-run title-hash
   - Triage via Claude (Sonnet 4.6) against `configs/relevance_rubric.yaml`, with prompt caching
-  - Outputs: SURFACE → full Slack block post, WORTH_NOTING → one-line, SKIP → audit-only
+  - Hard score-floor (`triage.apply_score_floor`) demotes total<5 to SKIP — kills competitor PR fluff and off-topic noise deterministically
+  - Outputs: SURFACE → individual rich Slack post; WORTH_NOTING → daily CSV at `data/outputs/worth_noting-YYYY-MM-DD.csv` + single Slack digest with top-5; SKIP → audit-only
   - Audit log: `data/state/opportunities.jsonl` (every candidate + triage decision)
-  - Run via `python -m src.monitor.main` (supports `--dry-run`) or GitHub Actions daily cron at 13:00 UTC
+  - Run via `python -m src.monitor.main` (supports `--dry-run`) or GitHub Actions daily cron at 13:00 UTC; workflow commits state + CSV + logs back to repo
 
 ## In progress
 
@@ -22,8 +23,14 @@ Current state of play. **Update at the end of every chat.**
 ## Next up - in slice order
 
 1. **Slice 1 operate-and-tune (1 week)**
-   - Run daily, watch Slack volume + audit log
+   - Run daily, watch Slack volume + the CSV
+   - React to SURFACE posts in Slack with 👍 / 👎 / 🎯 / 💤 (free training signal, harvest later)
+   - Append misses (things you wish had surfaced) to a running notes file
    - Tune rubric / queries based on what surfaces vs. what should have
+   - Build out training infrastructure (scoped for next chat — see plan in chat 2026-04-28):
+     - `rubric_version` field tagged in audit log
+     - `tools/eval.py` against a hand-labeled gold set (~30 items)
+     - `tools/harvest_slack.py` to pull reactions
    - Then revisit: HubSpot integration design, FL/TX state portal addition, NewsAPI upgrade decision
 
 2. **Slice 2: FL warm follow-up list**
