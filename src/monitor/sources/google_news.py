@@ -59,9 +59,12 @@ def _load_queries(config_path: Path) -> list[tuple[str, str]]:
     return flat
 
 
-def fetch(config_path: Path) -> list[Candidate]:
+def fetch(config_path: Path) -> tuple[list[Candidate], int]:
+    """Returns (candidates, total_dropped_stale). dropped_stale is surfaced
+    so the funnel footer in Slack can show the volume of pre-triage drops."""
     queries = _load_queries(config_path)
     candidates: list[Candidate] = []
+    total_dropped_stale = 0
     for category, q in queries:
         url = BASE.format(q=quote_plus(q))
         try:
@@ -95,6 +98,7 @@ def fetch(config_path: Path) -> list[Candidate]:
                 )
             )
             kept += 1
+        total_dropped_stale += dropped_stale
         if dropped_stale:
             LOG.info("google_news: query=%r kept=%d dropped_stale=%d (>%dd old)", q, kept, dropped_stale, _MAX_AGE_DAYS)
-    return candidates
+    return candidates, total_dropped_stale
