@@ -17,6 +17,12 @@ from src.monitor.candidate import Candidate
 LOG = logging.getLogger(__name__)
 ENDPOINT = "https://api.sam.gov/opportunities/v2/search"
 
+
+class SamAuthError(Exception):
+    """SAM.gov rejected the API key (401/403). Keys expire every 90 days, and
+    this used to fail silently for months: each keyword logged a warning and
+    the run reported 'sam.gov: 0 candidates' as if it were a quiet day."""
+
 # Keyword set tuned to Hohonu's topical fit. Broad enough to catch adjacent work,
 # narrow enough to keep the daily candidate count manageable. Triage is the real filter.
 KEYWORDS = [
@@ -31,11 +37,16 @@ KEYWORDS = [
 ]
 
 
-def fetch(api_key: str, lookback_days: int = 2, limit: int = 100) -> list[Candidate]:
+def fetch(api_key: str, lookback_days: int = 2, limit: int = 1000) -> list[Candidate]:
     """Pull opportunities posted in the lookback window for each keyword.
 
     Lookback default 2 days because the cron runs daily but we want a small
     overlap to absorb timezone / posting-delay edges. Dedup downstream handles repeats.
+    Longer lookbacks are for one-off backfills (SAM_LOOKBACK_DAYS in the workflow);
+    limit is the API max so a backfill window isn't silently truncated.
+
+    Raises SamAuthError on 401/403 so the caller can alert instead of
+    treating a dead key as an empty day.
     """
     today = date.today()
     posted_from = (today - timedelta(days=lookback_days)).strftime("%m/%d/%Y")
@@ -52,12 +63,21 @@ def fetch(api_key: str, lookback_days: int = 2, limit: int = 100) -> list[Candid
             "ptype": "o,k,p",  # solicitation, combined synopsis/solicitation, presolicitation
         }
         try:
-            resp = requests.get(ENDPOINT, params=params, timeout=30)
+            resp = requests.get(ENDPOINT, params=params, timeout=60)
+            if resp.status_code in (401, 403):
+                raise SamAuthError(f"HTTP {resp.status_code}")
             resp.raise_for_status()
             data = resp.json()
         except requests.RequestException as e:
-            LOG.warning("SAM.gov fetch failed for keyword=%r: %s", kw, e)
+            # Don't log the exception verbatim: `requests` puts the full URL,
+            # including api_key, in HTTPError messages. Same leak slack_notify avoids.
+            status = getattr(getattr(e, "response", None), "status_code", "?")
+            LOG.warning("SAM.gov fetch failed for keyword=%r (%s, status=%s)", kw, type(e).__name__, status)
             continue
+
+        total = data.get("totalRecords") or 0
+        if total > limit:
+            LOG.warning("SAM.gov keyword=%r has %d results, only first %d fetched", kw, total, limit)
 
         for item in data.get("opportunitiesData", []) or []:
             candidates.append(
