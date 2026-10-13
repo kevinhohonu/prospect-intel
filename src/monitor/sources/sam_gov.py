@@ -4,6 +4,13 @@ Docs: https://open.gsa.gov/api/get-opportunities-public-api/
 Endpoint: GET https://api.sam.gov/opportunities/v2/search
 Auth: api.data.gov key, free signup.
 Date format the API expects: MM/dd/yyyy.
+
+Keywords go in `title`. The API silently ignores a `keyword` param: until
+2026-10 every keyword returned the same unfiltered list of all federal
+postings (19,349 over 90 days), and the limit kept only the newest few.
+Title search misses opportunities that only mention a term in the full
+description; v2 search results don't include description text, so matching
+on it would mean triaging every federal posting.
 """
 from __future__ import annotations
 
@@ -56,7 +63,7 @@ def fetch(api_key: str, lookback_days: int = 2, limit: int = 1000) -> list[Candi
     for kw in KEYWORDS:
         params = {
             "api_key": api_key,
-            "keyword": kw,
+            "title": kw,
             "postedFrom": posted_from,
             "postedTo": posted_to,
             "limit": limit,
