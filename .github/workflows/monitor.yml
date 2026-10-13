@@ -42,7 +42,7 @@ jobs:
           SAM_API_KEY: ${{ secrets.SAM_API_KEY }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SAM_LOOKBACK_DAYS: ${{ inputs.sam_lookback_days || '2' }}
-        run: python probe.py && exit 0; python -m src.monitor.main ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: python -m src.monitor.main ${{ inputs.dry_run && '--dry-run' || '' }}
 
       - name: Commit state
         # Also on failure: a rejected SAM.gov key exits 1 after the other sources

@@ -30,17 +30,35 @@ class SamAuthError(Exception):
     this used to fail silently for months: each keyword logged a warning and
     the run reported 'sam.gov: 0 candidates' as if it were a quiet day."""
 
-# Keyword set tuned to Hohonu's topical fit. Broad enough to catch adjacent work,
-# narrow enough to keep the daily candidate count manageable. Triage is the real filter.
+# `title` is a case-insensitive substring match on the notice title, so terms
+# are short stems: federal titles read like "66--SENSOR,LIQUID LEVEL", and
+# phrases such as "water level" or "storm surge" matched nothing in 90 days.
+# Probed 2026-10-13 over 90 days: ~250 matches total, ~3/day. Triage is the
+# real filter. Left out as too noisy: "river" (bridge/freezer repair),
+# "stream", "tide" (matches "peptide").
 KEYWORDS = [
+    "gauge",
+    "gage",            # USACE/USGS spelling
+    "flood",
+    "levee",
+    "tidal",
     "water level",
-    "tide gauge",
-    "flood sensor",
-    "flood monitoring",
-    "hydrologic monitoring",
-    "coastal resilience",
-    "storm surge",
-    "flood early warning",
+    "liquid level",
+    "hydrolog",
+    "hydrograph",
+    "inundation",
+    "coastal",
+    "shoreline",
+    "resilien",
+    "surge",
+    "stormwater",
+    "early warning",
+    "warning system",
+    "monitoring",
+    "telemetry",
+    "sensor",
+    "NOAA",
+    "USGS",
 ]
 
 
@@ -67,7 +85,8 @@ def fetch(api_key: str, lookback_days: int = 2, limit: int = 1000) -> list[Candi
             "postedFrom": posted_from,
             "postedTo": posted_to,
             "limit": limit,
-            "ptype": "o,k,p",  # solicitation, combined synopsis/solicitation, presolicitation
+            # solicitation, combined synopsis/solicitation, presolicitation, sources sought
+            "ptype": "o,k,p,r",
         }
         try:
             resp = requests.get(ENDPOINT, params=params, timeout=60)
@@ -79,12 +98,12 @@ def fetch(api_key: str, lookback_days: int = 2, limit: int = 1000) -> list[Candi
             # Don't log the exception verbatim: `requests` puts the full URL,
             # including api_key, in HTTPError messages. Same leak slack_notify avoids.
             status = getattr(getattr(e, "response", None), "status_code", "?")
-            LOG.warning("SAM.gov fetch failed for keyword=%r (%s, status=%s)", kw, type(e).__name__, status)
+            LOG.warning("SAM.gov fetch failed for title=%r (%s, status=%s)", kw, type(e).__name__, status)
             continue
 
         total = data.get("totalRecords") or 0
         if total > limit:
-            LOG.warning("SAM.gov keyword=%r has %d results, only first %d fetched", kw, total, limit)
+            LOG.warning("SAM.gov title=%r has %d results, only first %d fetched", kw, total, limit)
 
         for item in data.get("opportunitiesData", []) or []:
             candidates.append(
