@@ -14,6 +14,10 @@ Pipeline:
 Run:
   python -m src.monitor.main           # full run
   python -m src.monitor.main --dry-run # fetch + triage, no Slack post, no seen-set update
+
+Env:
+  SAM_LOOKBACK_DAYS  SAM.gov posted-date window (default 2). Raise it with
+                     --dry-run for a one-off backfill after an outage.
 """
 from __future__ import annotations
 
@@ -107,15 +111,23 @@ def _setup_logging() -> None:
     )
 
 
-def _gather() -> tuple[list[Candidate], int]:
-    """Returns (all candidates, news_dropped_stale) for funnel reporting."""
+def _gather() -> tuple[list[Candidate], int, str | None]:
+    """Returns (all candidates, news_dropped_stale, sam_auth_error).
+    sam_auth_error is set when SAM.gov rejected the key; the other sources
+    still run so one dead key doesn't take out the whole day."""
     candidates: list[Candidate] = []
+    sam_auth_error = None
 
     sam_key = os.environ.get("SAM_API_KEY")
     if sam_key:
-        sam_results = sam_gov.fetch(api_key=sam_key)
-        LOG.info("sam.gov: %d candidates", len(sam_results))
-        candidates.extend(sam_results)
+        lookback = int(os.environ.get("SAM_LOOKBACK_DAYS") or 2)
+        try:
+            sam_results = sam_gov.fetch(api_key=sam_key, lookback_days=lookback)
+            LOG.info("sam.gov: %d candidates (lookback %d days)", len(sam_results), lookback)
+            candidates.extend(sam_results)
+        except sam_gov.SamAuthError as e:
+            sam_auth_error = str(e)
+            LOG.error("sam.gov: key rejected (%s); skipping SAM.gov", e)
     else:
         LOG.warning("SAM_API_KEY not set; skipping SAM.gov")
 
@@ -127,7 +139,7 @@ def _gather() -> tuple[list[Candidate], int]:
     LOG.info("google_news: %d candidates (dropped %d stale)", len(news_results), news_dropped_stale)
     candidates.extend(news_results)
 
-    return candidates, news_dropped_stale
+    return candidates, news_dropped_stale, sam_auth_error
 
 
 def run(dry_run: bool = False) -> int:
@@ -144,7 +156,7 @@ def run(dry_run: bool = False) -> int:
         LOG.error("SLACK_WEBHOOK_URL missing")
         return 1
 
-    raw, news_dropped_stale = _gather()
+    raw, news_dropped_stale, sam_auth_error = _gather()
     LOG.info("raw candidates: %d", len(raw))
 
     seen = dedup.load_seen()
@@ -213,6 +225,13 @@ def run(dry_run: bool = False) -> int:
         "errored": errored,
     }
 
+    # Dry runs post nothing, so write every triaged item to one CSV for review
+    # (SURFACEs otherwise only land in the audit log).
+    if dry_run and fresh:
+        dry_path = WORTH_NOTING_CSV_DIR / f"dry_run-{stamp}.csv"
+        _write_items_csv(surfaced_items + worth_noting_items + skipped_items, dry_path)
+        LOG.info("dry-run CSV: %s (%d items)", dry_path, len(fresh))
+
     borderline_link = _csv_link(borderline_path) if borderline_path else None
     if not dry_run and webhook:
         if worth_noting_items:
@@ -238,6 +257,18 @@ def run(dry_run: bool = False) -> int:
         funnel["fetched"], funnel["stale_dropped"], funnel["deduped"], funnel["fresh"],
         funnel["surfaced"], funnel["worth_noting"], funnel["skipped"], funnel["floored"], funnel["errored"],
     )
+
+    if sam_auth_error:
+        if not dry_run and webhook:
+            slack_notify.post_alert(
+                webhook,
+                f"SAM.gov rejected the API key ({sam_auth_error}), so federal opportunities "
+                "were not checked today. SAM.gov keys expire every 90 days: generate a new one "
+                "on sam.gov and update the `SAM_API_KEY` secret in GitHub.",
+            )
+        # Non-zero exit so the Actions run goes red and GitHub emails about it.
+        # The workflow still commits state, so the other sources' results stick.
+        return 1
     return 0
 
 
