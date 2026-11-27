@@ -161,6 +161,13 @@ def post_quiet_heartbeat(
     return _post(webhook_url, {"blocks": blocks}, "quiet-day heartbeat")
 
 
+def post_alert(webhook_url: str, text: str) -> bool:
+    """Operational problem with the monitor itself (e.g. an expired source key),
+    as opposed to an opportunity. Posted every run until fixed, on purpose."""
+    blocks = [{"type": "section", "text": {"type": "mrkdwn", "text": f":warning: *Monitor problem:* {text}"}}]
+    return _post(webhook_url, {"blocks": blocks}, "monitor alert")
+
+
 def post_surface(webhook_url: str, candidate: Candidate, triage: TriageResult) -> bool:
     if triage.classification != "SURFACE":
         return False
